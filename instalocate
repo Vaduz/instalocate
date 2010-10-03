@@ -1,0 +1,122 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use Term::ANSIColor;
+use Term::Screen;
+use Term::ReadKey;
+
+$Term::ANSIColor::AUTORESET = 1;
+my $ignore_case = '';
+my ($verbose);
+my ($wchar, $hchar, $wpixels, $hpixels) = GetTerminalSize();
+my $result_line = $hchar - 3;
+my $print_threshold = 100;
+my $prompt = "$0: ";
+my $min_search_char = 2;
+my $input = '';
+my $initial_message = '(press ? to get help)';
+my @usage = (
+    "Usage: $0",
+    '   -i : ignore case',
+    '   -v : verbose mode',
+);
+
+GetOptions(
+    'i' => \$ignore_case,
+    'v' => \$verbose,
+);
+if ($ignore_case) {
+    $ignore_case = '-i ';
+}
+
+my @stats = `locate -S`;
+map { chomp $_ } @stats;
+
+my $screen = new Term::Screen;
+die 'Something wrong' unless $screen;
+
+$screen->noecho()->clrscr()->at(0, 0)->puts("$prompt$input")
+       ->at(1, 0)->puts("$initial_message")->at(2, 0);
+for (my $i = 0; $i < $#stats; $i++) {
+    $screen->at(2 + $i, 0)->puts($stats[$i]);
+}
+$screen->at(0, length("$prompt$input"));
+
+while (my $c = $screen->getch()) {
+# FIXME exit unexpectedly when pressed '0'
+    # DEBUG
+    $prompt = sprintf("%4d", ord($c)) . ': ';
+# ETX EOT
+    if ($c =~ /^[\x03\x04]$/) {
+        $screen->at($result_line, 0);
+        exit;
+    }
+# DEL
+    elsif ($c =~ /^[\x7f\x08]$/) {
+        $input =~ s/.$//;
+    }
+# CR
+    elsif ($c =~ /^[\x0d]$/) {
+        if ($input) {
+            my @paths = `locate $ignore_case$input`;
+            for (my $i = 0; $i < $#paths; $i++) {
+                $screen->at(2 + $i, 0)->puts(colorize($paths[$i], $input));
+            }
+            $screen->at(2 + $#paths);
+        }
+        else {
+            $screen->at(2, 0);
+        }
+        exit;
+    }
+# TAB
+    elsif ($c =~ /^[\x09]$/) {
+        my @paths = `locate $ignore_case-l $result_line $input`;
+        for (my $i = 0; $i < $#paths and $i < $result_line; $i++) {
+            $screen->at(2 + $i, 0)->puts(colorize($paths[$i], $input));
+        }
+        $screen->at(0, length("$prompt$input"));
+        next;
+    }
+# ? to get help
+    elsif ($c =~ /\?/) {
+        $screen->clrscr()->at(0, 0);
+        for (my $i = 0; $i < $#usage + 1; $i++) {
+            $screen->at($i, 0)->puts($usage[$i]);
+        }
+        $screen->at($#usage + 1, 0);
+        exit;
+    }
+    else {
+        $input .= $c;
+    }
+    #else {
+    #    next;
+    #}
+    $screen->clrscr()->puts("$prompt$input")->at(0, length("$prompt$input"));
+    
+    if (length($input) > $min_search_char) {
+        my $path_count = `locate $ignore_case-c $input`;
+        chomp $path_count;
+        $path_count--;
+        $screen->at(1, 0)->puts("$path_count Hits");
+        if ($path_count < $print_threshold) {
+            my @paths = `locate $ignore_case -l $print_threshold $input`;
+            for (my $i = 0; $i < $#paths and $i < $result_line; $i++) {
+                $screen->at(2 + $i, 0)->puts(colorize($paths[$i], $input));
+            }
+        }
+    }
+    $screen->at(0, length("$prompt$input"));
+}
+
+sub colorize()
+{
+    my ($text, $target) = @_;
+    my $colord_target = colored($target, 'red');
+    $text =~ s/$target/$colord_target/ig;
+    return $text;
+}
