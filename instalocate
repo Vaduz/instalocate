@@ -48,7 +48,7 @@ $screen->at(0, length("$prompt$input"));
 while (my $c = $screen->getch()) {
 # FIXME exit unexpectedly when pressed '0'
     # DEBUG
-    $prompt = sprintf("%4d", ord($c)) . ': ';
+    #$prompt = sprintf("%4d", ord($c)) . ': ';
 # ETX EOT
     if ($c =~ /^[\x03\x04]$/) {
         $screen->at($result_line, 0);
