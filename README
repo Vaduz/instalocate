@@ -1,0 +1,7 @@
+instalocate - New concept of LOCATE(1)
+
+Feature
+* incremental-search on your filesystem
+* highlighted keyword on results and candidates
+* zsh/bash like completion
+* counts result
